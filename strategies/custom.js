@@ -15,49 +15,70 @@ var strat = {};
 
 // Prepare everything our method needs
 strat.init = function() {
-  this.input = 'candle';
-  this.currentTrend = 'long';
-  this.requiredHistory = 0;
-}
+  this.hasCrossed = false;
+  this.hold = true;
+  this.enteredTheMarket = false;
+  this.addTulipIndicator('fast', 'ema', {
+    optInTimePeriod: this.settings.fast
+  });
+  this.addTulipIndicator('slow', 'ema', {
+    optInTimePeriod: this.settings.slow
+  });
+
+  this.warmupPeriod = 0;
+};
 
 // What happens on every new candle?
 strat.update = function(candle) {
+  const fastCurb = this.tulipIndicators.fast.result.result;
+  const slowCurb = this.tulipIndicators.slow.result.result;
 
-  // Get a random number between 0 and 1.
-  this.randomNumber = Math.random();
+  const isWarmingUp = this.warmupPeriod < this.settings.slow;
+  if (isWarmingUp) {
+    this.warmupPeriod++;
+  }
 
-  // There is a 10% chance it is smaller than 0.1
-  this.toUpdate = this.randomNumber < 0.1;
+
+  if (this._currentDirection === 'long' && 
+    candle.close / this.lastBuyPrice < 1 - this.settings.lossThresholdPercentage/100) {
+        this.hold = false;
+  } else if(this.previousFastCurb !== undefined && this.previousSlowCurb !== undefined && !isWarmingUp) {
+    const hasCrossed = (this.previousSlowCurb < this.previousFastCurb) !== (slowCurb < fastCurb);
+    if ((slowCurb < fastCurb ) && (hasCrossed || !this.enteredTheMarket)) {
+      this.hold = false;
+      this.enteredTheMarket = true;
+      console.log(candle.start.format('LLLL'));
+      console.log('yellow', slowCurb);
+      console.log('green', fastCurb);
+    } else   {
+      this.hold = true;
+    }
+  }
+  this.previousSlowCurb = slowCurb;
+  this.previousFastCurb = fastCurb;
 }
 
 // For debugging purposes.
 strat.log = function() {
-  log.debug('calculated random number:');
-  log.debug('\t', this.randomNumber.toFixed(3));
+  // log.debug('calculated random number:');
+  // log.debug('\t', this.randomNumber.toFixed(3));
 }
 
 // Based on the newly calculated
 // information, check if we should
 // update or not.
-strat.check = function() {
-
-  // Only continue if we have a new update.
-  if(!this.toUpdate)
+strat.check = function() {  
+  if(this.hold) {
     return;
-
-  if(this.currentTrend === 'long') {
-
-    // If it was long, set it to short
-    this.currentTrend = 'short';
-    this.advice('short');
-
-  } else {
-
-    // If it was short, set it to long
-    this.currentTrend = 'long';
-    this.advice('long');
-
   }
-}
+
+  if(this._currentDirection === 'long') {
+    // If it was long, set it to short
+    this.advice('short');
+  } else {
+    // If it was short, set it to long
+    this.advice('long');
+  }
+};
 
 module.exports = strat;

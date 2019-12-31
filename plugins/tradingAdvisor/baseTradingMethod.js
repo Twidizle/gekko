@@ -62,9 +62,6 @@ var Base = function(settings) {
   if(!this.end)
     this.end = function() {};
 
-  if(!this.onTrade)
-    this.onTrade = function() {};
-
   // let's run the implemented starting point
   this.init();
 
@@ -216,6 +213,16 @@ Base.prototype.processTrade = function(trade) {
   }
 
   this.onTrade(trade);
+}
+
+Base.prototype.onTrade = function (trade) {
+  if (trade.action === 'sell') {
+    this.lastBuyPrice = undefined;
+    this.lastSellPrice = trade.price;
+  } else {
+    this.lastBuyPrice = trade.price;
+    this.lastSellPrice = undefined;
+  }
 }
 
 Base.prototype.addTalibIndicator = function(name, type, parameters) {
